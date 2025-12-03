@@ -3,48 +3,59 @@ import pandas as pd
 import os
 from datetime import datetime
 
-# --- 1. CONFIGURAÇÃO VISUAL (DASHBOARD PREMIUM) ---
+# --- 1. CONFIGURAÇÃO VISUAL (GRID FORÇADO NO MOBILE) ---
 st.set_page_config(page_title="GestorPRO", layout="centered", page_icon="💎")
 
 st.markdown("""
     <style>
-    /* FUNDO E GERAL */
+    /* FUNDO */
     .main { background-color: #f8f9fa; }
     h1 { color: #1e293b; font-weight: 800; }
     
-    /* ESTILO DOS BOTÕES DO MENU (GRID) */
+    /* --- CSS MÁGICO PARA FORÇAR GRID NO CELULAR --- */
+    /* Isso obriga as colunas a ficarem lado a lado (50% cada) mesmo em telas pequenas */
+    @media (max-width: 576px) {
+        div[data-testid="column"] {
+            width: 50% !important;
+            flex: 0 0 50% !important;
+            min-width: 50% !important;
+        }
+    }
+    
+    /* ESTILO DOS BOTÕES (CARDS) */
     div.stButton > button {
         width: 100%;
-        height: 90px; /* Botões altos para parecerem Cards */
-        font-size: 18px;
+        height: 100px; /* Altura fixa para parecer cartão */
+        font-size: 18px; /* Fonte ajustada para caber no celular */
         font-weight: 600;
-        border-radius: 16px;
+        border-radius: 12px;
         background-color: white;
         border: 1px solid #e2e8f0;
         color: #334155;
         box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
-        transition: all 0.2s ease-in-out;
+        white-space: pre-wrap; /* Permite que o texto quebre linha se ficar apertado */
     }
     div.stButton > button:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
         border-color: #3b82f6;
         color: #3b82f6;
+        transform: translateY(-2px);
     }
 
-    /* BOTÕES DE NAVEGAÇÃO (VOLTAR/HOME) - MENORES */
-    .nav-btn { height: 50px !important; background-color: #f1f5f9 !important; }
+    /* Ajuste para botões de navegação (Voltar) não ficarem gigantes */
+    div[data-testid="column"] .nav-btn button {
+        height: 50px !important;
+        background-color: #f1f5f9 !important;
+    }
 
     /* KPI CARDS */
     div[data-testid="metric-container"] {
         background-color: white;
-        padding: 15px;
-        border-radius: 12px;
+        padding: 10px;
+        border-radius: 10px;
         border: 1px solid #e2e8f0;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
     }
     
-    /* ESCONDER MENU PADRÃO */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
@@ -64,9 +75,6 @@ def format_brl(valor):
         return f"R$ {val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
     except: return "R$ 0,00"
 
-def format_data_br_coluna(series):
-    return pd.to_datetime(series).dt.strftime('%d/%m/%Y')
-
 def format_data_visual(data_input):
     if data_input is None: return ""
     try:
@@ -77,11 +85,11 @@ def format_data_visual(data_input):
     except: return str(data_input)
 
 # --- 3. BANCO DE DADOS ---
-DB_FUNC = 'db_funcionarios_v16.csv'
-DB_PONTO = 'db_ponto_v16.csv'
-DB_VEICULOS = 'db_veiculos_v16.csv'
-DB_FINANCEIRO = 'db_financeiro_v16.csv'
-DB_CONFIG = 'db_config_v16.csv'
+DB_FUNC = 'db_funcionarios_v17.csv'
+DB_PONTO = 'db_ponto_v17.csv'
+DB_VEICULOS = 'db_veiculos_v17.csv'
+DB_FINANCEIRO = 'db_financeiro_v17.csv'
+DB_CONFIG = 'db_config_v17.csv'
 
 COLS_FUNC = ["Nome", "Funcao", "Valor_Diaria", "Data_Inicio", "Chave_Pix", "Banco"]
 COLS_PONTO = ["Data", "Nome", "Qtd_Dias", "Descricao"]
@@ -120,14 +128,18 @@ def ir_para(tela, voltar_para='inicio'):
 
 def barra_nav(destino):
     st.markdown("---")
-    st.markdown("""<style>div.stButton > button {height: 50px;}</style>""", unsafe_allow_html=True) # Reduz botões de nav
+    # Classe específica para os botões de voltar não ficarem enormes
     c1, c2 = st.columns(2)
     with c1: 
+        st.markdown('<div class="nav-btn">', unsafe_allow_html=True)
         if st.button("⬅️ VOLTAR"): ir_para(destino)
+        st.markdown('</div>', unsafe_allow_html=True)
     with c2: 
+        st.markdown('<div class="nav-btn">', unsafe_allow_html=True)
         if st.button("🏠 INÍCIO"): ir_para('inicio')
+        st.markdown('</div>', unsafe_allow_html=True)
 
-# ================= TELA 1: DASHBOARD EM GRID =================
+# ================= TELA 1: DASHBOARD (LAYOUT FIXO) =================
 def tela_inicio():
     st.title("GestorPRO")
     st.caption(f"Hoje: {datetime.now().strftime('%d/%m/%Y')}")
@@ -142,21 +154,22 @@ def tela_inicio():
         fatura_cartao = abs(filtro_cartao["Valor"].sum())
 
     c1, c2 = st.columns(2)
-    c1.metric("Caixa Disponível", format_brl(saldo_real))
+    c1.metric("Caixa", format_brl(saldo_real))
     c2.metric("Fatura Cartão", format_brl(fatura_cartao), delta_color="inverse")
     
-    st.write("") # Espaço em branco
+    st.write("") # Espaço
     st.subheader("Menu Principal")
     
-    # --- GRID LAYOUT (2 COLUNAS) ---
-    col1, col2 = st.columns(2, gap="medium")
+    # --- GRID REALMENTE LADO A LADO ---
+    # O CSS injetado no início força estas colunas a ficarem lado a lado no celular
+    col1, col2 = st.columns(2)
     
     with col1:
-        if st.button("👷 EQUIPE\n& RH"): ir_para('menu_equipe', 'inicio')
+        if st.button("👷 EQUIPE\n& Ponto"): ir_para('menu_equipe', 'inicio')
         if st.button("🚛 FROTA\n& Máquinas"): ir_para('menu_frota', 'inicio')
         
     with col2:
-        if st.button("💰 FINANCEIRO\n& Extrato"): ir_para('menu_fin', 'inicio')
+        if st.button("💰 CAIXA\n& Extrato"): ir_para('menu_fin', 'inicio')
         if st.button("💳 CARTÕES\n& Faturas"): ir_para('menu_cartao', 'inicio')
 
 # ================= TELA 2: EQUIPE =================
@@ -174,10 +187,9 @@ def tela_equipe():
     nome_sel = st.selectbox("Selecione o Colaborador:", df_func["Nome"].unique())
     st.session_state['func_atual'] = nome_sel
     
-    # Recupera Dados
-    # Usamos .iloc[0] para pegar a linha como Serie
+    # Dados
     linha_dados = df_func[df_func["Nome"] == nome_sel].iloc[0]
-    idx_dados = df_func[df_func["Nome"] == nome_sel].index[0] # Pega o índice para edição
+    idx_dados = df_func[df_func["Nome"] == nome_sel].index[0]
     
     # Cálculos
     df_ponto = load_data(DB_PONTO, COLS_PONTO)
@@ -188,16 +200,15 @@ def tela_equipe():
     
     a_receber = (dias * float(linha_dados["Valor_Diaria"])) - abs(pagos)
     
-    # Visualização
     st.info(f"Função: **{linha_dados['Funcao']}** | Admissão: **{format_data_visual(linha_dados['Data_Inicio'])}**")
     
     c1, c2, c3 = st.columns(3)
-    c1.metric("Dias Trab.", f"{dias:g}")
-    c2.metric("Já Pago", format_brl(abs(pagos)))
-    c3.metric("A Pagar", format_brl(a_receber))
+    c1.metric("Dias", f"{dias:g}")
+    c2.metric("Pago", format_brl(abs(pagos)))
+    c3.metric("Saldo", format_brl(a_receber))
     
-    # Abas de Ação
-    tab1, tab2 = st.tabs(["⚡ AÇÕES RÁPIDAS", "✏️ ALTERAR DADOS"])
+    # Abas
+    tab1, tab2 = st.tabs(["⚡ AÇÕES", "✏️ EDITAR"])
     
     with tab1:
         c1, c2 = st.columns(2)
@@ -209,23 +220,20 @@ def tela_equipe():
             if st.button("📝 FALTA"): ir_para('acao_falta', 'menu_equipe')
 
     with tab2:
-        st.write("Edite as informações e salve:")
+        st.write("Alterar dados:")
         with st.form("edit_func"):
             novo_nome = st.text_input("Nome", value=linha_dados['Nome'])
             nova_funcao = st.selectbox("Função", LISTA_FUNCOES, index=LISTA_FUNCOES.index(linha_dados['Funcao']) if linha_dados['Funcao'] in LISTA_FUNCOES else 0)
             novo_valor = st.number_input("Diária (R$)", min_value=0.0, value=float(linha_dados['Valor_Diaria']))
             
-            # Data convertida para objeto date
-            try:
-                dt_obj = datetime.strptime(str(linha_dados['Data_Inicio']), '%Y-%m-%d').date()
-            except:
-                dt_obj = datetime.now()
+            try: dt_obj = datetime.strptime(str(linha_dados['Data_Inicio']), '%Y-%m-%d').date()
+            except: dt_obj = datetime.now()
             nova_data = st.date_input("Admissão", value=dt_obj, format="DD/MM/YYYY")
             
             novo_pix = st.text_input("PIX", value=str(linha_dados['Chave_Pix']))
             novo_banco = st.text_input("Banco", value=str(linha_dados['Banco']))
             
-            if st.form_submit_button("💾 SALVAR ALTERAÇÕES"):
+            if st.form_submit_button("SALVAR ALTERAÇÕES"):
                 df_func.at[idx_dados, "Nome"] = novo_nome
                 df_func.at[idx_dados, "Funcao"] = nova_funcao
                 df_func.at[idx_dados, "Valor_Diaria"] = novo_valor
@@ -233,7 +241,7 @@ def tela_equipe():
                 df_func.at[idx_dados, "Chave_Pix"] = novo_pix
                 df_func.at[idx_dados, "Banco"] = novo_banco
                 save_full(DB_FUNC, df_func)
-                st.toast("Dados Atualizados!", icon="🔄")
+                st.toast("Atualizado!")
                 st.rerun()
                 
         if st.button("🗑️ EXCLUIR CADASTRO"):
@@ -248,10 +256,7 @@ def tela_cad_func():
     with st.form("cad_func", clear_on_submit=True):
         nome = st.text_input("Nome Completo")
         func = st.selectbox("Função", LISTA_FUNCOES)
-        
-        # DATA FORMATADA DD/MM/YYYY
         dt_ini = st.date_input("Data de Admissão", datetime.now(), format="DD/MM/YYYY")
-        
         val = st.number_input("Valor da Diária (R$)", min_value=0.0, value=None, placeholder="0,00")
         
         st.caption("Bancário (Opcional)")
@@ -273,7 +278,6 @@ def tela_acao_equipe(tipo):
     
     with st.form(f"form_{tipo}", clear_on_submit=True):
         if tipo == "Ponto":
-            # DATA FORMATADA
             dt = st.date_input("Data", datetime.now(), format="DD/MM/YYYY")
             op = st.radio("Registro", ["Dia Completo (1.0)", "Meio Dia (0.5)", "Falta (0.0)"])
             if st.form_submit_button("CONFIRMAR"):
@@ -324,9 +328,9 @@ def tela_frota():
     gastos = df_fin[df_fin["Entidade"] == veic]
     total = abs(gastos[gastos["Valor"] < 0]["Valor"].sum())
     
-    st.metric("Custo Acumulado", format_brl(total))
+    st.metric("Custo Total", format_brl(total))
     
-    tab1, tab2 = st.tabs(["AÇÕES", "DADOS"])
+    tab1, tab2 = st.tabs(["AÇÕES", "EDITAR"])
     
     with tab1:
         c1, c2 = st.columns(2)
@@ -336,9 +340,8 @@ def tela_frota():
             if st.button("🔧 MANUTENÇÃO"): ir_para('acao_manut', 'menu_frota')
             
     with tab2:
-        st.write("Editar Veículo:")
         with st.form("edit_veic"):
-            n_mod = st.text_input("Modelo/Nome", value=str(dados_veic['Veiculo']).split(' - ')[0])
+            n_mod = st.text_input("Modelo", value=str(dados_veic['Veiculo']).split(' - ')[0])
             n_placa = st.text_input("Placa", value=str(dados_veic['Placa']))
             n_km = st.number_input("KM Inicial", value=int(dados_veic['Km_Inicial']))
             
@@ -413,7 +416,6 @@ def tela_fin():
         for idx, row in df.iterrows():
             with st.container():
                 c1, c2, c3 = st.columns([3, 2, 1])
-                # Data formatada BR
                 dt = pd.to_datetime(row['Data']).strftime('%d/%m/%Y')
                 with c1:
                     st.write(f"**{row['Descricao']}**")
@@ -456,8 +458,7 @@ def tela_cartoes():
     st.title("Cartões de Crédito")
     df = load_data(DB_FINANCEIRO, COLS_FIN)
     if df.empty:
-        st.info("Sem dados.")
-        barra_nav('inicio'); return
+        st.info("Sem dados."); barra_nav('inicio'); return
         
     credito = df[(df["Metodo_Pagto"] == "Cartão de Crédito") & (df["Valor"] < 0)]
     total = abs(credito["Valor"].sum())
