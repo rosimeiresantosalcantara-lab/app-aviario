@@ -3,22 +3,26 @@ import pandas as pd
 import os
 from datetime import datetime
 
-# --- 1. CONFIGURAÇÃO VISUAL ---
+# --- 1. CONFIGURAÇÃO VISUAL (LAYOUT GRID MANTIDO) ---
 st.set_page_config(page_title="GestorPRO", layout="centered", page_icon="💎")
 
 st.markdown("""
     <style>
-    /* CSS PARA FORÇAR GRID NO CELULAR (MANTIDO) */
+    /* CSS PARA FORÇAR GRID NO CELULAR */
     @media (max-width: 576px) {
         div[data-testid="column"] { width: 48% !important; flex: 0 0 48% !important; min-width: 10px !important; }
     }
+    /* Estilo dos Botões Principais */
     .btn-main > button {
-        width: 100%; height: 100px; font-size: 18px !important; font-weight: 700 !important;
+        width: 100%; height: 90px; font-size: 18px !important; font-weight: 700 !important;
         border-radius: 16px !important; background: white !important;
         border: 1px solid #cbd5e1 !important; color: #1e293b !important;
         box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05) !important; margin-bottom: 10px !important;
     }
+    /* Estilo dos Botões de Ação */
     .btn-action > button { height: 60px; border-radius: 12px; font-weight: 600; background-color: #f8fafc; }
+    
+    /* Esconder menus técnicos */
     #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
     </style>
 """, unsafe_allow_html=True)
@@ -40,13 +44,14 @@ def format_data_visual(data_input):
         return data_input.strftime('%d/%m/%Y')
     except: return str(data_input)
 
-# --- 3. BANCO DE DADOS ---
-DB_FUNC = 'db_funcionarios_v19.csv'
-DB_PONTO = 'db_ponto_v19.csv'
-DB_VEICULOS = 'db_veiculos_v19.csv'
-DB_FINANCEIRO = 'db_financeiro_v19.csv'
-DB_CONFIG = 'db_config_v19.csv'
+# --- 3. BANCO DE DADOS (NOMES FIXOS) ---
+DB_FUNC = 'db_funcionarios_final.csv'
+DB_PONTO = 'db_ponto_final.csv'
+DB_VEICULOS = 'db_veiculos_final.csv'
+DB_FINANCEIRO = 'db_financeiro_final.csv'
+DB_CONFIG = 'db_config_final.csv'
 
+# Colunas
 COLS_FUNC = ["Nome", "Funcao", "Valor_Diaria", "Data_Inicio", "Chave_Pix", "Banco"]
 COLS_PONTO = ["Data", "Nome", "Qtd_Dias", "Descricao"]
 COLS_VEIC = ["Veiculo", "Placa", "Km_Inicial"]
@@ -72,12 +77,27 @@ def add_row(arquivo, dados, cols):
 def save_full(arquivo, df):
     df.to_csv(arquivo, index=False)
 
-def delete_row(arquivo, index_real, cols):
-    """Função segura para deletar e salvar imediatamente"""
-    df = load_data(arquivo, cols)
+# --- FUNÇÃO ESPECIAL DE EXCLUSÃO (CORREÇÃO DE BUG) ---
+def excluir_item_seguro(arquivo, coluna_id, valor_id, cols_padrao):
+    """
+    Remove uma linha baseada em uma coluna (ex: Nome) e salva imediatamente.
+    """
+    df = load_data(arquivo, cols_padrao)
+    if not df.empty:
+        # Mantém apenas as linhas que NÃO são o item que queremos excluir
+        df = df[df[coluna_id] != valor_id]
+        df.to_csv(arquivo, index=False)
+        return True
+    return False
+
+def excluir_por_index(arquivo, index_real, cols_padrao):
+    """
+    Remove uma linha pelo número do index (para financeiro).
+    """
+    df = load_data(arquivo, cols_padrao)
     if index_real in df.index:
         df = df.drop(index_real)
-        save_full(arquivo, df)
+        df.to_csv(arquivo, index=False)
         return True
     return False
 
@@ -101,20 +121,19 @@ def barra_nav(destino):
 # ================= TELA 1: DASHBOARD =================
 def tela_inicio():
     st.title("GestorPRO")
-    st.caption(f"🗓️ Hoje: {datetime.now().strftime('%d/%m/%Y')}")
+    st.caption(f"🗓️ {datetime.now().strftime('%d/%m/%Y')}")
     
-    # Recalcula sempre que abre a tela
     df_fin = load_data(DB_FINANCEIRO, COLS_FIN)
     saldo_real = df_fin["Valor"].sum() if not df_fin.empty else 0.0
     
     fatura_cartao = 0.0
     if not df_fin.empty:
-        filtro_cartao = df_fin[(df_fin["Metodo_Pagto"] == "Cartão de Crédito") & (df_fin["Valor"] < 0)]
-        fatura_cartao = abs(filtro_cartao["Valor"].sum())
+        filtro = df_fin[(df_fin["Metodo_Pagto"] == "Cartão de Crédito") & (df_fin["Valor"] < 0)]
+        fatura_cartao = abs(filtro["Valor"].sum())
 
     c1, c2 = st.columns(2)
-    c1.metric("Caixa Disponível", format_brl(saldo_real))
-    c2.metric("Fatura Cartão", format_brl(fatura_cartao), delta_color="inverse")
+    c1.metric("Caixa", format_brl(saldo_real))
+    c2.metric("Cartão", format_brl(fatura_cartao), delta_color="inverse")
     
     st.write("") 
     st.subheader("Menu Principal")
@@ -122,56 +141,60 @@ def tela_inicio():
     c_menu1, c_menu2 = st.columns(2)
     with c_menu1:
         st.markdown('<div class="btn-main">', unsafe_allow_html=True)
-        if st.button("👷 EQUIPE\n& Ponto"): ir_para('menu_equipe', 'inicio')
+        if st.button("👷 EQUIPE\n& RH"): ir_para('menu_equipe', 'inicio')
         st.markdown('</div>', unsafe_allow_html=True)
+        
         st.markdown('<div class="btn-main">', unsafe_allow_html=True)
-        if st.button("🚛 FROTA\n& Máquinas"): ir_para('menu_frota', 'inicio')
+        if st.button("🚛 FROTA\n& Veículos"): ir_para('menu_frota', 'inicio')
         st.markdown('</div>', unsafe_allow_html=True)
 
     with c_menu2:
         st.markdown('<div class="btn-main">', unsafe_allow_html=True)
-        if st.button("💰 FINANCEIRO\n& Extrato"): ir_para('menu_fin', 'inicio')
+        if st.button("💰 CAIXA\n& Extrato"): ir_para('menu_fin', 'inicio')
         st.markdown('</div>', unsafe_allow_html=True)
+        
         st.markdown('<div class="btn-main">', unsafe_allow_html=True)
         if st.button("💳 CARTÕES\n& Faturas"): ir_para('menu_cartao', 'inicio')
         st.markdown('</div>', unsafe_allow_html=True)
 
 # ================= TELA 2: EQUIPE =================
 def tela_equipe():
-    st.title("Gestão de Pessoas")
+    st.title("Gestão de Equipe")
+    
     st.markdown('<div class="btn-action">', unsafe_allow_html=True)
     if st.button("➕ NOVO COLABORADOR"): ir_para('cad_func', 'menu_equipe')
     st.markdown('</div>', unsafe_allow_html=True)
     
     df_func = load_data(DB_FUNC, COLS_FUNC)
     if df_func.empty:
-        st.info("Nenhum cadastro encontrado.")
+        st.info("Nenhum cadastro.")
         barra_nav('inicio'); return
 
     st.write("---")
-    nome_sel = st.selectbox("Selecione o Colaborador:", df_func["Nome"].unique())
+    nome_sel = st.selectbox("Selecione:", df_func["Nome"].unique())
     st.session_state['func_atual'] = nome_sel
     
-    # Dados e Cálculos
+    # Dados
     linha = df_func[df_func["Nome"] == nome_sel].iloc[0]
     
+    # Cálculos
     df_ponto = load_data(DB_PONTO, COLS_PONTO)
     dias = df_ponto[df_ponto["Nome"] == nome_sel]["Qtd_Dias"].sum()
     
     df_fin = load_data(DB_FINANCEIRO, COLS_FIN)
-    # Filtra pagamentos e vales deste funcionário
     pgtos = df_fin[(df_fin["Entidade"] == nome_sel) & (df_fin["Valor"] < 0)]
-    total_pago = abs(pgtos["Valor"].sum()) if not pgtos.empty else 0.0
+    total_pago = abs(pgtos["Valor"].sum())
     
     a_receber = (dias * float(linha["Valor_Diaria"])) - total_pago
     
     st.info(f"Função: **{linha['Funcao']}**")
+    
     c1, c2, c3 = st.columns(3)
     c1.metric("Dias", f"{dias:g}")
-    c2.metric("Recebido", format_brl(total_pago))
+    c2.metric("Pago", format_brl(total_pago))
     c3.metric("Saldo", format_brl(a_receber))
     
-    tab1, tab2 = st.tabs(["AÇÕES", "HISTÓRICO FINANCEIRO"])
+    tab1, tab2, tab3 = st.tabs(["AÇÕES", "EXTRATO", "CONFIG"])
     
     with tab1:
         c1, c2 = st.columns(2)
@@ -183,25 +206,31 @@ def tela_equipe():
             if st.button("📝 FALTA"): ir_para('acao_falta', 'menu_equipe')
             
     with tab2:
-        # Mini extrato do funcionário com opção de excluir erro
         if not pgtos.empty:
             pgtos['idx_real'] = pgtos.index
-            pgtos = pgtos.sort_index(ascending=False)
-            
-            for i, row in pgtos.iterrows():
+            for i, row in pgtos.sort_index(ascending=False).iterrows():
                 idx_real = row['idx_real']
                 c_txt, c_del = st.columns([4, 1])
                 with c_txt:
                     st.write(f"**{row['Descricao']}** | {format_brl(row['Valor'])}")
-                    st.caption(f"{format_data_visual(row['Data'])}")
+                    st.caption(format_data_visual(row['Data']))
                 with c_del:
-                    if st.button("🗑️", key=f"del_func_{idx_real}"):
-                        delete_row(DB_FINANCEIRO, idx_real, COLS_FIN)
-                        st.toast("Excluído! O saldo foi atualizado.")
+                    # Botão para excluir lançamento financeiro específico
+                    if st.button("🗑️", key=f"del_fin_{idx_real}"):
+                        excluir_por_index(DB_FINANCEIRO, idx_real, COLS_FIN)
+                        st.toast("Item excluído!")
                         st.rerun()
                 st.divider()
         else:
-            st.caption("Nenhum pagamento ou vale registrado.")
+            st.caption("Sem histórico financeiro.")
+
+    with tab3:
+        # AQUI ESTÁ A CORREÇÃO DA EXCLUSÃO DO CADASTRO
+        st.write("Zona de Perigo:")
+        if st.button("🗑️ EXCLUIR ESTE FUNCIONÁRIO"):
+            excluir_item_seguro(DB_FUNC, "Nome", nome_sel, COLS_FUNC)
+            st.success("Funcionário excluído com sucesso!")
+            st.rerun()
 
     barra_nav('inicio')
 
@@ -211,8 +240,10 @@ def tela_cad_func():
         nome = st.text_input("Nome Completo")
         func = st.selectbox("Função", ["Pedreiro", "Servente", "Mestre", "Motorista", "Cozinheira", "Outro"])
         dt_ini = st.date_input("Admissão", datetime.now(), format="DD/MM/YYYY")
-        val = st.number_input("Diária (R$)", min_value=0.0, value=None, placeholder="0,00")
-        st.caption("Opcional: PIX/Banco"); pix = st.text_input("Chave PIX"); banco = st.text_input("Banco")
+        val = st.number_input("Valor Diária (R$)", min_value=0.0, value=None, placeholder="0,00")
+        st.caption("Dados Bancários (Opcional)")
+        banco = st.text_input("Banco")
+        pix = st.text_input("Chave PIX")
         
         if st.form_submit_button("SALVAR"):
             if nome and val:
@@ -234,7 +265,7 @@ def tela_acao_equipe(tipo):
                 st.toast("Ponto Salvo!")
         elif tipo in ["Vale", "Pagamento"]:
             val = st.number_input("Valor (R$)", min_value=0.0, value=None, placeholder="0,00")
-            metodo = st.selectbox("Forma Pagto", ["PIX", "Dinheiro", "Transferência"])
+            metodo = st.selectbox("Pago via", ["PIX", "Dinheiro", "Transferência"])
             obs = st.text_input("Obs")
             if st.form_submit_button("LANÇAR"):
                 if val:
@@ -265,6 +296,7 @@ def tela_frota():
     df_fin = load_data(DB_FINANCEIRO, COLS_FIN)
     gastos = df_fin[df_fin["Entidade"] == veic]
     total = abs(gastos[gastos["Valor"] < 0]["Valor"].sum())
+    
     st.metric("Custo Total", format_brl(total))
     
     tab1, tab2 = st.tabs(["AÇÕES", "EXTRATO VEÍCULO"])
@@ -274,6 +306,13 @@ def tela_frota():
             if st.button("⛽ ABASTECER"): ir_para('acao_abast', 'menu_frota')
         with c2: 
             if st.button("🔧 MANUTENÇÃO"): ir_para('acao_manut', 'menu_frota')
+        
+        st.write("")
+        if st.button("🗑️ EXCLUIR VEÍCULO"):
+            excluir_item_seguro(DB_VEICULOS, "Veiculo", veic, COLS_VEIC)
+            st.success("Veículo excluído.")
+            st.rerun()
+
     with tab2:
         if not gastos.empty:
             gastos['idx_real'] = gastos.index
@@ -285,7 +324,7 @@ def tela_frota():
                     st.caption(format_data_visual(row['Data']))
                 with c_del:
                     if st.button("🗑️", key=f"del_fr_{idx}"):
-                        delete_row(DB_FINANCEIRO, idx, COLS_FIN)
+                        excluir_por_index(DB_FINANCEIRO, idx, COLS_FIN)
                         st.rerun()
                 st.divider()
 
@@ -316,16 +355,16 @@ def tela_acao_frota(tipo):
         
         if st.form_submit_button("LANÇAR"):
             if val:
-                desc = f"Abast. {lit}L (KM {km})" if tipo=="Abastecer" else f"Manut: {item}"
+                desc = f"Abast. {lit}L" if tipo=="Abastecer" else f"Manut: {item}"
+                if tipo=="Abastecer": desc += f" (KM {km})"
                 add_row(DB_FINANCEIRO, {"Data": datetime.now(), "Categoria": "Combustível" if tipo=="Abastecer" else "Manutenção", "Descricao": desc, "Valor": -val, "Entidade": veic, "Metodo_Pagto": pagto}, COLS_FIN)
                 st.toast("Salvo!")
     barra_nav('menu_frota')
 
-# ================= TELA 4: FINANCEIRO (COM NOVA ABA DE EXTRATO) =================
+# ================= TELA 4: FINANCEIRO =================
 def tela_fin():
     st.title("Financeiro")
     
-    # Botões de Ação
     c1, c2 = st.columns(2)
     with c1: 
         if st.button("➕ RECEITA"): ir_para('fin_receita', 'menu_fin')
@@ -334,61 +373,56 @@ def tela_fin():
         
     st.write("---")
     
-    # NOVA ABA EXTRATO DETALHADO
-    tab_resumo, tab_extrato = st.tabs(["RESUMO RÁPIDO", "🔍 EXTRATO DETALHADO"])
+    # NOVA ABA: EXTRATO COMPLETO
+    tab_resumo, tab_extrato = st.tabs(["RESUMO RÁPIDO", "🔍 EXTRATO COMPLETO"])
     
     df = load_data(DB_FINANCEIRO, COLS_FIN)
     
     with tab_resumo:
         if not df.empty:
-            df['idx_real'] = df.index
-            # Mostra apenas os últimos 5
-            for i, row in df.sort_index(ascending=False).head(5).iterrows():
-                idx = row['idx_real']
+            # Mostra últimos 5 lançamentos
+            df_recent = df.sort_values("Data", ascending=False).head(5)
+            for idx, row in df_recent.iterrows():
                 with st.container():
                     c1, c2 = st.columns([3, 1])
+                    dt = pd.to_datetime(row['Data']).strftime('%d/%m/%Y')
                     with c1:
                         st.write(f"**{row['Descricao']}**")
-                        st.caption(f"{format_data_visual(row['Data'])} • {row['Metodo_Pagto']}")
+                        st.caption(f"{dt} • {row['Metodo_Pagto']}")
                     with c2:
                         cor = "green" if row['Valor']>0 else "red"
                         st.markdown(f"<span style='color:{cor}'><b>{format_brl(row['Valor'])}</b></span>", unsafe_allow_html=True)
                     st.divider()
         else:
-            st.info("Sem lançamentos recentes.")
+            st.info("Sem lançamentos.")
 
     with tab_extrato:
-        st.write("### Controle Total")
+        st.write("### Histórico Detalhado")
+        st.caption("Aqui você pode apagar lançamentos errados.")
+        
         if not df.empty:
-            # Filtros
-            cat_filtro = st.multiselect("Filtrar Categoria", df["Categoria"].unique())
-            df_show = df.copy()
-            if cat_filtro:
-                df_show = df_show[df_show["Categoria"].isin(cat_filtro)]
+            # Filtro de Categoria
+            cats = st.multiselect("Filtrar Categoria", df["Categoria"].unique())
+            df_show = df if not cats else df[df["Categoria"].isin(cats)]
             
-            # Tabela Editável (Delete funciona aqui também)
             df_show['idx_real'] = df_show.index
             for i, row in df_show.sort_index(ascending=False).iterrows():
-                idx = row['idx_real']
-                c_txt, c_val, c_del = st.columns([4, 2, 1])
-                with c_txt:
-                    st.write(f"{row['Descricao']}")
-                    st.caption(f"{format_data_visual(row['Data'])} | {row['Entidade']}")
-                with c_val:
-                     cor = "green" if row['Valor']>0 else "red"
-                     st.markdown(f"<span style='color:{cor}'>{format_brl(row['Valor'])}</span>", unsafe_allow_html=True)
-                with c_del:
-                    # Correção: Delete direto no arquivo usando o índice real
-                    if st.button("🗑️", key=f"del_fin_{idx}"):
-                        delete_row(DB_FINANCEIRO, idx, COLS_FIN)
-                        st.toast("Item excluído do caixa!")
-                        st.rerun()
-                st.divider()
-            
-            # Totais do filtro
-            total_filtro = df_show["Valor"].sum()
-            st.info(f"Saldo do filtro acima: {format_brl(total_filtro)}")
-
+                idx_real = row['idx_real']
+                with st.container():
+                    c1, c2, c3 = st.columns([4, 2, 1])
+                    with c1:
+                        st.write(f"{row['Descricao']}")
+                        st.caption(f"{format_data_visual(row['Data'])} | {row['Entidade']}")
+                    with c2:
+                         cor = "green" if row['Valor']>0 else "red"
+                         st.markdown(f"<span style='color:{cor}'>{format_brl(row['Valor'])}</span>", unsafe_allow_html=True)
+                    with c3:
+                        # BOTÃO DE EXCLUIR DEFINITIVO
+                        if st.button("🗑️", key=f"del_all_{idx_real}"):
+                            excluir_por_index(DB_FINANCEIRO, idx_real, COLS_FIN)
+                            st.toast("Lançamento excluído!")
+                            st.rerun()
+                    st.divider()
     barra_nav('inicio')
 
 def tela_movimento(tipo):
@@ -431,7 +465,7 @@ def tela_cartoes():
                 st.caption(format_data_visual(row['Data']))
             with c2:
                 if st.button("🗑️", key=f"del_card_{idx}"):
-                    delete_row(DB_FINANCEIRO, idx, COLS_FIN)
+                    excluir_por_index(DB_FINANCEIRO, idx, COLS_FIN)
                     st.rerun()
             st.divider()
     barra_nav('inicio')
