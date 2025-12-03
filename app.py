@@ -3,12 +3,12 @@ import pandas as pd
 import os
 from datetime import datetime
 
-# --- 1. CONFIGURAÇÃO VISUAL PREMIUM ---
-st.set_page_config(page_title="Gestor Aviário PRO", layout="centered", page_icon="🏗️")
+# --- 1. CONFIGURAÇÃO VISUAL ---
+st.set_page_config(page_title="Gestor Aviário Gold", layout="centered", page_icon="🚜")
 
 st.markdown("""
     <style>
-    /* Botões Padrão App */
+    /* Botões Grandes e Robustos */
     .stButton>button {
         width: 100%;
         height: 60px;
@@ -16,25 +16,17 @@ st.markdown("""
         font-weight: 600;
         border-radius: 12px;
         margin-bottom: 8px;
-        background-color: #ffffff;
-        border: 1px solid #d1d5db;
-        color: #1f2937;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        color: #212529;
     }
-    .stButton>button:hover {
-        border-color: #3b82f6;
-        color: #3b82f6;
-    }
-    /* Botões de Navegação (Voltar/Home) - Destaque Diferente */
-    .nav-btn {
-        border: 1px solid #ef4444 !important;
-        color: #ef4444 !important;
-    }
+    .stButton>button:hover { border-color: #0d6efd; color: #0d6efd; }
     
-    /* Cabeçalhos e Métricas */
-    h1 { font-size: 2.2rem; font-weight: 800; color: #111827; }
-    h2 { font-size: 1.5rem; font-weight: 700; color: #374151; }
-    [data-testid="stMetricValue"] { font-size: 1.8rem; font-weight: bold; }
+    /* Destaque Vermelho para botões de perigo */
+    .botao-perigo { color: red; border-color: red; }
+    
+    /* Métricas Grandes */
+    [data-testid="stMetricValue"] { font-size: 1.6rem; font-weight: 700; color: #2c3e50; }
     
     /* Esconder menu padrão */
     #MainMenu {visibility: hidden;}
@@ -42,10 +34,17 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 2. SISTEMA DE ARQUIVOS (DATABASE) ---
-DB_FUNC = 'db_funcionarios.csv'
-DB_VEICULOS = 'db_veiculos.csv' # Novo!
-DB_MOVIMENTOS = 'db_financeiro.csv'
+# --- 2. FERRAMENTAS (Utils) ---
+
+# Função Mágica para R$ Brasileiro
+def format_brl(valor):
+    if valor is None: return "R$ 0,00"
+    return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+# Gerenciamento de Arquivos
+DB_FUNC = 'db_funcionarios_v9.csv'
+DB_VEICULOS = 'db_veiculos_v9.csv'
+DB_MOVIMENTOS = 'db_financeiro_v9.csv'
 DB_OBRA = 'db_obra_config.csv'
 
 def load_data(arquivo, colunas):
@@ -53,61 +52,57 @@ def load_data(arquivo, colunas):
         pd.DataFrame(columns=colunas).to_csv(arquivo, index=False)
     return pd.read_csv(arquivo)
 
-def save_row(arquivo, df, row_data):
-    novo = pd.DataFrame([row_data])
-    df = pd.concat([df, novo], ignore_index=True)
-    df.to_csv(arquivo, index=False)
-
 def save_full(arquivo, df):
     df.to_csv(arquivo, index=False)
 
-# --- 3. NAVEGAÇÃO INTELIGENTE ---
+def add_row(arquivo, row_data):
+    df = load_data(arquivo, list(row_data.keys()))
+    df = pd.concat([df, pd.DataFrame([row_data])], ignore_index=True)
+    df.to_csv(arquivo, index=False)
+
+# --- 3. NAVEGAÇÃO ---
 if 'tela' not in st.session_state: st.session_state['tela'] = 'inicio'
-if 'hist_voltar' not in st.session_state: st.session_state['hist_voltar'] = 'inicio' # Para saber pra onde voltar
+if 'hist_voltar' not in st.session_state: st.session_state['hist_voltar'] = 'inicio'
 
 def ir_para(tela, voltar_para='inicio'):
     st.session_state['hist_voltar'] = voltar_para
     st.session_state['tela'] = tela
     st.rerun()
 
-def barra_navegacao(tela_anterior):
+def barra_navegacao(destino_voltar):
     st.markdown("---")
     c1, c2 = st.columns(2)
     with c1:
-        if st.button("⬅️ VOLTAR TELA"): 
-            ir_para(tela_anterior)
+        if st.button("⬅️ VOLTAR"): ir_para(destino_voltar)
     with c2:
-        if st.button("🏠 MENU INICIAL"): 
-            ir_para('inicio')
+        if st.button("🏠 MENU PRINCIPAL"): ir_para('inicio')
 
-# ================= TELA 1: DASHBOARD (HOME) =================
+# ================= TELA 1: HOME (DASHBOARD) =================
 def tela_inicio():
-    st.image("https://cdn-icons-png.flaticon.com/512/2666/2666505.png", width=60) # Ícone ilustrativo
-    st.title("Painel de Controle")
+    st.title("🚜 Painel de Controle")
     
-    # 1. KPIs (Indicadores Principais)
+    # Cálculos Globais
     df_mov = load_data(DB_MOVIMENTOS, ["Valor"])
     saldo = df_mov["Valor"].sum() if not df_mov.empty else 0.0
     
     df_obra = load_data(DB_OBRA, ["Valor_Total"])
-    total_obra = float(df_obra["Valor_Total"].iloc[0]) if not df_obra.empty else 0.0
+    total_contrato = float(df_obra["Valor_Total"].iloc[0]) if not df_obra.empty else 0.0
+    
     recebido = df_mov[df_mov["Valor"] > 0]["Valor"].sum() if not df_mov.empty else 0.0
-    falta_receber = total_obra - recebido
-
-    # Cartões de Resumo
-    col1, col2 = st.columns(2)
-    col1.metric("Caixa (Saldo)", f"R$ {saldo:,.2f}", delta_color="normal")
-    col2.metric("A Receber", f"R$ {falta_receber:,.2f}", delta_color="inverse")
+    falta_receber = total_contrato - recebido
+    
+    # Exibição Formatada
+    c1, c2 = st.columns(2)
+    c1.metric("Caixa Atual", format_brl(saldo))
+    c2.metric("A Receber (Contrato)", format_brl(falta_receber))
     
     st.divider()
-    
-    # 2. Menu de Ações
-    st.subheader("O que deseja acessar?")
+    st.subheader("Acesso Rápido")
     
     if st.button("👷 GESTÃO DE EQUIPE"): ir_para('menu_equipe', 'inicio')
-    if st.button("🚛 FROTA & VEÍCULOS"): ir_para('menu_frota', 'inicio')
-    if st.button("💰 FINANCEIRO DA OBRA"): ir_para('menu_financeiro', 'inicio')
-    if st.button("⚙️ CONFIGURAÇÕES DA OBRA"): ir_para('config_obra', 'inicio')
+    if st.button("🚛 FROTA E VEÍCULOS"): ir_para('menu_frota', 'inicio')
+    if st.button("💰 FINANCEIRO GERAL"): ir_para('menu_financeiro', 'inicio')
+    if st.button("⚙️ VALOR DO CONTRATO"): ir_para('config_obra', 'inicio')
 
 # ================= TELA 2: EQUIPE =================
 def tela_equipe():
@@ -115,157 +110,204 @@ def tela_equipe():
     
     if st.button("➕ CADASTRAR NOVO FUNCIONÁRIO"): ir_para('cad_func', 'menu_equipe')
     
-    df = load_data(DB_FUNC, ["Nome", "Funcao", "Valor_Diaria"])
+    df = load_data(DB_FUNC, ["Nome", "Funcao", "Valor_Diaria", "Data_Inicio"])
+    
     if df.empty:
-        st.warning("Cadastre alguém primeiro.")
+        st.info("Nenhum cadastro.")
         barra_navegacao('inicio')
         return
 
-    func = st.selectbox("Selecione o Colaborador:", df["Nome"].unique())
-    st.session_state['func_atual'] = func
+    st.write("Selecione para ver detalhes, pagar ou editar:")
+    func_selecionado = st.selectbox("Colaborador:", df["Nome"].unique())
+    st.session_state['func_atual'] = func_selecionado
     
-    # Dashboard do Funcionário
-    dados = df[df["Nome"] == func].iloc[0]
-    st.info(f"Cargo: {dados['Funcao']} | Diária: R$ {dados['Valor_Diaria']}")
+    # Recupera dados
+    dados = df[df["Nome"] == func_selecionado].iloc[0]
     
+    # Cálculo Acumulado do Funcionário
+    df_fin = load_data(DB_MOVIMENTOS, ["Descricao", "Valor"])
+    # Filtra pagamentos onde a descrição contem o nome
+    filtro = df_fin[df_fin["Descricao"].str.contains(func_selecionado, na=False)]
+    total_pago = abs(filtro[filtro["Valor"] < 0]["Valor"].sum())
+    
+    st.info(f"**{dados['Funcao']}** | Diária: {format_brl(dados['Valor_Diaria'])} | Início: {dados['Data_Inicio']}")
+    st.caption(f"💰 Total já pago a este funcionário na obra: {format_brl(total_pago)}")
+    
+    # Ações
     c1, c2 = st.columns(2)
     with c1:
         if st.button("⏰ PONTO"): ir_para('acao_ponto', 'menu_equipe')
         if st.button("💸 VALE"): ir_para('acao_vale', 'menu_equipe')
     with c2:
         if st.button("✅ PAGAMENTO"): ir_para('acao_pgto', 'menu_equipe')
-        if st.button("📝 FALTAS/OBS"): ir_para('acao_obs', 'menu_equipe')
+        if st.button("📝 FALTAS"): ir_para('acao_obs', 'menu_equipe')
+
+    # Área de Edição/Exclusão
+    with st.expander(f"✏️ Editar ou Excluir {func_selecionado}"):
+        st.write("Correção de Cadastro:")
+        with st.form("edit_func"):
+            novo_nome = st.text_input("Nome", value=dados['Nome'])
+            nova_funcao = st.selectbox("Função", ["Pedreiro", "Servente", "Mestre", "Cozinheira", "Outro"], index=0)
+            novo_valor = st.number_input("Valor Diária", value=float(dados['Valor_Diaria']))
+            if st.form_submit_button("SALVAR CORREÇÃO"):
+                # Atualiza linha
+                df.loc[df["Nome"] == func_selecionado, ["Nome", "Funcao", "Valor_Diaria"]] = [novo_nome, nova_funcao, novo_valor]
+                save_full(DB_FUNC, df)
+                st.success("Atualizado!")
+                st.rerun()
+        
+        st.divider()
+        if st.button("🗑️ EXCLUIR CADASTRO DEFINITIVAMENTE"):
+            df = df[df["Nome"] != func_selecionado]
+            save_full(DB_FUNC, df)
+            st.success("Excluído!")
+            st.rerun()
 
     barra_navegacao('inicio')
 
 def tela_cad_func():
     st.header("Novo Cadastro")
-    with st.form("form_func"):
+    st.write("Preencha os dados abaixo:")
+    with st.form("form_cad_func"):
         nome = st.text_input("Nome Completo")
+        dt_inicio = st.date_input("Data de Início", datetime.now())
         func = st.selectbox("Função", ["Pedreiro", "Servente", "Mestre", "Cozinheira", "Motorista"])
-        val = st.number_input("Valor Diária (R$)", min_value=0.0)
-        if st.form_submit_button("SALVAR"):
-            df = load_data(DB_FUNC, ["Nome", "Funcao", "Valor_Diaria"])
-            save_row(DB_FUNC, df, {"Nome": nome, "Funcao": func, "Valor_Diaria": val})
-            st.success("Cadastrado!")
-            ir_para('menu_equipe')
+        
+        # CAMPO LIMPO (value=None)
+        val = st.number_input("Valor Diária (R$)", min_value=0.0, value=None, placeholder="Digite o valor...")
+        
+        if st.form_submit_button("💾 SALVAR"):
+            if nome and val is not None:
+                add_row(DB_FUNC, {"Nome": nome, "Funcao": func, "Valor_Diaria": val, "Data_Inicio": dt_inicio})
+                st.success("Cadastrado!")
+                ir_para('menu_equipe')
+            else:
+                st.error("Nome e Valor são obrigatórios.")
     barra_navegacao('menu_equipe')
 
-# --- Ações de Equipe ---
-def acao_equipe_generica(tipo):
+# --- Ações Genéricas Equipe ---
+def tela_acoes_equipe(tipo):
     nome = st.session_state['func_atual']
     st.header(f"{tipo}: {nome}")
     
     if tipo == "Ponto":
-        st.info("O registro de ponto serve para seu controle pessoal de dias trabalhados.")
         dt = st.date_input("Data", datetime.now())
         status = st.radio("Presença", ["Dia Completo", "Meio Dia", "Falta"])
-        if st.button("CONFIRMAR PONTO"):
-            # Lógica simples: Salva apenas registro visual no histórico financeiro com valor 0
-            df = load_data(DB_MOVIMENTOS, ["Data", "Categoria", "Descricao", "Valor"])
-            save_row(DB_MOVIMENTOS, df, {"Data": dt, "Categoria": "Ponto", "Descricao": f"Ponto {nome} - {status}", "Valor": 0})
-            st.success("Registrado!")
-            ir_para('menu_equipe')
-            
-    elif tipo == "Vale":
-        val = st.number_input("Valor do Vale (R$)", min_value=0.0)
-        obs = st.text_input("Motivo")
-        if st.button("DAR VALE (SAÍDA DE CAIXA)"):
-            df = load_data(DB_MOVIMENTOS, ["Data", "Categoria", "Descricao", "Valor"])
-            save_row(DB_MOVIMENTOS, df, {
-                "Data": datetime.now(), "Categoria": "Mão de Obra", 
-                "Descricao": f"Vale {nome} ({obs})", "Valor": -val
-            })
-            st.success("Vale lançado!")
+        if st.button("CONFIRMAR"):
+            add_row(DB_MOVIMENTOS, {"Data": dt, "Categoria": "Ponto", "Descricao": f"Ponto {nome} ({status})", "Valor": 0})
+            st.success("Ponto registrado!")
             ir_para('menu_equipe')
 
-    elif tipo == "Pagamento":
-        val = st.number_input("Valor Final (Acerto)", min_value=0.0)
-        if st.button("PAGAR ACERTO"):
-            df = load_data(DB_MOVIMENTOS, ["Data", "Categoria", "Descricao", "Valor"])
-            save_row(DB_MOVIMENTOS, df, {
-                "Data": datetime.now(), "Categoria": "Mão de Obra", 
-                "Descricao": f"Pgto Final {nome}", "Valor": -val
-            })
-            st.success("Pago!")
+    elif tipo in ["Vale", "Pagamento"]:
+        # CAMPO LIMPO
+        val = st.number_input("Valor (R$)", min_value=0.0, value=None, placeholder="Digite o valor...")
+        obs = st.text_input("Obs (Opcional)") if tipo == "Vale" else "Acerto Final"
+        
+        if st.button("CONFIRMAR SAÍDA"):
+            if val is not None:
+                desc = f"{tipo} {nome}" + (f" ({obs})" if obs else "")
+                add_row(DB_MOVIMENTOS, {"Data": datetime.now(), "Categoria": "Mão de Obra", "Descricao": desc, "Valor": -val})
+                st.success("Lançado no financeiro!")
+                ir_para('menu_equipe')
+            else:
+                st.warning("Digite o valor.")
+                
+    elif tipo == "Faltas":
+        motivo = st.text_area("Motivo da Ocorrência")
+        if st.button("SALVAR"):
+            add_row(DB_MOVIMENTOS, {"Data": datetime.now(), "Categoria": "Ocorrência", "Descricao": f"Obs {nome}: {motivo}", "Valor": 0})
+            st.success("Anotado.")
             ir_para('menu_equipe')
             
     barra_navegacao('menu_equipe')
 
-# ================= TELA 3: FROTA (NOVA FUNCIONALIDADE) =================
+# ================= TELA 3: FROTA =================
 def tela_frota():
     st.title("🚛 Frota")
     
-    if st.button("➕ CADASTRAR NOVO VEÍCULO"): ir_para('cad_veiculo', 'menu_frota')
+    if st.button("➕ CADASTRAR VEÍCULO"): ir_para('cad_veiculo', 'menu_frota')
     
-    df_v = load_data(DB_VEICULOS, ["Veiculo", "Placa", "Km_Inicial"])
-    
-    if df_v.empty:
-        st.warning("Nenhum veículo cadastrado.")
+    df = load_data(DB_VEICULOS, ["Veiculo", "Placa", "Km_Inicial"])
+    if df.empty:
+        st.warning("Nenhum veículo.")
         barra_navegacao('inicio')
         return
 
-    veiculo_escolhido = st.selectbox("Selecione o Veículo:", df_v["Veiculo"].unique())
-    st.session_state['veiculo_atual'] = veiculo_escolhido
+    veic = st.selectbox("Selecione o Veículo:", df["Veiculo"].unique())
+    st.session_state['veiculo_atual'] = veic
     
-    # Recupera KM inicial
-    km_ini = df_v[df_v["Veiculo"] == veiculo_escolhido]["Km_Inicial"].values[0]
-    st.caption(f"KM de Registro: {km_ini}")
+    # Dados e Acumulado
+    dados = df[df["Veiculo"] == veic].iloc[0]
+    
+    df_fin = load_data(DB_MOVIMENTOS, ["Descricao", "Valor"])
+    filtro = df_fin[df_fin["Descricao"].str.contains(veic, na=False)]
+    total_gasto = abs(filtro[filtro["Valor"] < 0]["Valor"].sum())
+    
+    st.info(f"Placa: {dados['Placa']} | KM Inicial: {dados['Km_Inicial']}")
+    st.caption(f"💸 Custo total acumulado com este veículo: {format_brl(total_gasto)}")
     
     c1, c2 = st.columns(2)
     with c1:
         if st.button("⛽ ABASTECER"): ir_para('acao_abastecer', 'menu_frota')
     with c2:
         if st.button("🔧 MANUTENÇÃO"): ir_para('acao_manutencao', 'menu_frota')
-        
+
+    # Editar/Excluir Veículo
+    with st.expander(f"✏️ Editar {veic}"):
+        with st.form("edit_veic"):
+            n_mod = st.text_input("Modelo", value=dados['Veiculo'])
+            n_placa = st.text_input("Placa", value=dados['Placa'])
+            if st.form_submit_button("SALVAR CORREÇÃO"):
+                df.loc[df["Veiculo"] == veic, ["Veiculo", "Placa"]] = [n_mod, n_placa]
+                save_full(DB_VEICULOS, df)
+                st.success("Salvo!")
+                st.rerun()
+        if st.button("🗑️ EXCLUIR VEÍCULO"):
+            df = df[df["Veiculo"] != veic]
+            save_full(DB_VEICULOS, df)
+            st.rerun()
+
     barra_navegacao('inicio')
 
 def tela_cad_veiculo():
-    st.header("Cadastrar Veículo")
-    with st.form("novo_carro"):
-        modelo = st.text_input("Modelo (Ex: Hilux Prata)")
-        placa = st.text_input("Placa (Opcional)")
-        km = st.number_input("Quilometragem Atual", min_value=0)
-        
+    st.header("Novo Veículo")
+    with st.form("cad_veic"):
+        modelo = st.text_input("Modelo (Ex: Hilux)")
+        placa = st.text_input("Placa")
+        km = st.number_input("KM Atual", min_value=0, value=None, placeholder="Digite o KM...")
         if st.form_submit_button("SALVAR"):
-            nome_final = f"{modelo} ({placa})" if placa else modelo
-            df = load_data(DB_VEICULOS, ["Veiculo", "Placa", "Km_Inicial"])
-            save_row(DB_VEICULOS, df, {"Veiculo": nome_final, "Placa": placa, "Km_Inicial": km})
-            st.success("Veículo salvo!")
-            ir_para('menu_frota')
+            if modelo:
+                nome_f = f"{modelo} {placa}"
+                add_row(DB_VEICULOS, {"Veiculo": nome_f, "Placa": placa, "Km_Inicial": km if km else 0})
+                st.success("Salvo!")
+                ir_para('menu_frota')
     barra_navegacao('menu_frota')
 
-def acao_frota_generica(tipo):
-    veiculo = st.session_state['veiculo_atual']
-    st.header(f"{tipo}: {veiculo}")
+def tela_acao_frota(tipo):
+    veic = st.session_state['veiculo_atual']
+    st.header(f"{tipo}: {veic}")
     
     if tipo == "Abastecer":
-        km_hoje = st.number_input("KM Atual (Painel)", min_value=0)
-        litros = st.number_input("Litros", min_value=0.0)
-        valor = st.number_input("Valor Total (R$)", min_value=0.0)
+        km = st.number_input("KM no Painel", min_value=0, value=None, placeholder="KM atual...")
+        litros = st.number_input("Litros", min_value=0.0, value=None, placeholder="Litros...")
+        val = st.number_input("Valor Total (R$)", min_value=0.0, value=None, placeholder="Valor pago...")
         
-        if st.button("SALVAR ABASTECIMENTO"):
-            df = load_data(DB_MOVIMENTOS, ["Data", "Categoria", "Descricao", "Valor"])
-            save_row(DB_MOVIMENTOS, df, {
-                "Data": datetime.now(), "Categoria": "Combustível", 
-                "Descricao": f"{veiculo} ({litros}L | KM {km_hoje})", "Valor": -valor
-            })
-            st.success("Registrado!")
-            ir_para('menu_frota')
-            
+        if st.button("SALVAR"):
+            if val is not None:
+                desc = f"Abastec. {veic} ({litros}L | KM {km})"
+                add_row(DB_MOVIMENTOS, {"Data": datetime.now(), "Categoria": "Combustível", "Descricao": desc, "Valor": -val})
+                st.success("Salvo!")
+                ir_para('menu_frota')
+                
     elif tipo == "Manutenção":
-        item = st.text_input("O que foi feito? (Ex: Pneu, Óleo)")
-        valor = st.number_input("Valor Gasto (R$)", min_value=0.0)
-        
-        if st.button("SALVAR MANUTENÇÃO"):
-            df = load_data(DB_MOVIMENTOS, ["Data", "Categoria", "Descricao", "Valor"])
-            save_row(DB_MOVIMENTOS, df, {
-                "Data": datetime.now(), "Categoria": "Manutenção", 
-                "Descricao": f"{veiculo} - {item}", "Valor": -valor
-            })
-            st.success("Registrado!")
-            ir_para('menu_frota')
-            
+        item = st.text_input("O que fez? (Ex: Pneu)")
+        val = st.number_input("Valor (R$)", min_value=0.0, value=None, placeholder="Valor...")
+        if st.button("SALVAR"):
+            if val is not None:
+                add_row(DB_MOVIMENTOS, {"Data": datetime.now(), "Categoria": "Manutenção", "Descricao": f"Manut. {veic} - {item}", "Valor": -val})
+                st.success("Salvo!")
+                ir_para('menu_frota')
+                
     barra_navegacao('menu_frota')
 
 # ================= TELA 4: FINANCEIRO =================
@@ -274,97 +316,56 @@ def tela_financeiro():
     
     c1, c2 = st.columns(2)
     with c1:
-        if st.button("➕ RECEBER (ENTRADA)"): ir_para('fin_entrada', 'menu_financeiro')
+        if st.button("➕ ENTRADA (RECEITA)"): ir_para('fin_entrada', 'menu_financeiro')
     with c2:
-        if st.button("➖ GASTO GERAL (MATERIAIS)"): ir_para('fin_saida', 'menu_financeiro')
+        if st.button("➖ SAÍDA (GASTO GERAL)"): ir_para('fin_saida', 'menu_financeiro')
         
     st.divider()
-    st.subheader("📜 Extrato Recente")
+    st.subheader("📜 Extrato e Correções")
     
     df = load_data(DB_MOVIMENTOS, ["Data", "Categoria", "Descricao", "Valor"])
+    
     if not df.empty:
-        # Mostra os ultimos 10, invertido
-        df['idx_original'] = df.index
-        df_show = df.sort_index(ascending=False).head(10)
+        # Modo de edição
+        if 'edit_idx' not in st.session_state: st.session_state['edit_idx'] = -1
+        
+        # Mostra lista inversa (mais recente primeiro)
+        df['idx_real'] = df.index
+        df_show = df.sort_index(ascending=False).head(20) # Ultimos 20
         
         for i, row in df_show.iterrows():
+            idx_real = row['idx_real']
+            
+            # Layout Visual
             cor = "green" if row['Valor'] > 0 else "red"
-            cols = st.columns([4, 1])
-            with cols[0]:
+            c_txt, c_act = st.columns([3, 1])
+            
+            with c_txt:
                 st.markdown(f"**{row['Descricao']}**")
                 st.caption(f"{row['Data']} | {row['Categoria']}")
-                st.markdown(f"<span style='color:{cor}; font-weight:bold'>R$ {row['Valor']:,.2f}</span>", unsafe_allow_html=True)
-            with cols[1]:
-                if st.button("🗑️", key=f"del_{row['idx_original']}"):
-                    df = df.drop(row['idx_original'])
+                st.markdown(f"<span style='color:{cor}; font-weight:bold'>{format_brl(row['Valor'])}</span>", unsafe_allow_html=True)
+                
+            with c_act:
+                # Botão Excluir
+                if st.button("🗑️", key=f"del_{idx_real}"):
+                    df = df.drop(idx_real)
                     save_full(DB_MOVIMENTOS, df)
                     st.rerun()
-            st.write("---")
+                # Botão Editar (Abre form abaixo)
+                if st.button("✏️", key=f"ed_{idx_real}"):
+                    st.session_state['edit_idx'] = idx_real
+                    st.rerun()
             
-    barra_navegacao('inicio')
-
-def tela_fin_movimento(tipo):
-    st.header(f"Registrar {tipo}")
-    
-    desc = st.text_input("Descrição (Ex: Cimento, Pagamento Etapa 1)")
-    valor = st.number_input("Valor (R$)", min_value=0.0)
-    
-    cat = "Receita" if tipo == "Entrada" else "Material/Outros"
-    
-    if st.button("SALVAR"):
-        val_final = valor if tipo == "Entrada" else -valor
-        df = load_data(DB_MOVIMENTOS, ["Data", "Categoria", "Descricao", "Valor"])
-        save_row(DB_MOVIMENTOS, df, {
-            "Data": datetime.now(), "Categoria": cat, 
-            "Descricao": desc, "Valor": val_final
-        })
-        st.success("Salvo!")
-        ir_para('menu_financeiro')
-        
-    barra_navegacao('menu_financeiro')
-
-def tela_config_obra():
-    st.title("⚙️ Configuração da Obra")
-    st.info("Defina aqui o valor total do contrato para acompanhar quanto falta receber.")
-    
-    df = load_data(DB_OBRA, ["Valor_Total"])
-    atual = float(df["Valor_Total"].iloc[0]) if not df.empty else 0.0
-    
-    novo_val = st.number_input("Valor Total do Contrato (R$)", value=atual)
-    
-    if st.button("ATUALIZAR CONTRATO"):
-        pd.DataFrame([{"Valor_Total": novo_val}]).to_csv(DB_OBRA, index=False)
-        st.success("Atualizado!")
-        
-    barra_navegacao('inicio')
-
-# ================= ROTEADOR PRINCIPAL =================
-def main():
-    tela = st.session_state['tela']
-    
-    if tela == 'inicio': tela_inicio()
-    
-    # Equipe
-    elif tela == 'menu_equipe': tela_equipe()
-    elif tela == 'cad_func': tela_cad_func()
-    elif tela == 'acao_ponto': acao_equipe_generica("Ponto")
-    elif tela == 'acao_vale': acao_equipe_generica("Vale")
-    elif tela == 'acao_pgto': acao_equipe_generica("Pagamento")
-    elif tela == 'acao_obs': 
-        st.info("Em breve: Bloco de notas para justificativas.")
-        barra_navegacao('menu_equipe')
-        
-    # Frota
-    elif tela == 'menu_frota': tela_frota()
-    elif tela == 'cad_veiculo': tela_cad_veiculo()
-    elif tela == 'acao_abastecer': acao_frota_generica("Abastecer")
-    elif tela == 'acao_manutencao': acao_frota_generica("Manutenção")
-    
-    # Financeiro & Config
-    elif tela == 'menu_financeiro': tela_financeiro()
-    elif tela == 'fin_entrada': tela_fin_movimento("Entrada")
-    elif tela == 'fin_saida': tela_fin_movimento("Saída")
-    elif tela == 'config_obra': tela_config_obra()
-
-if __name__ == "__main__":
-    main()
+            # Formulário de Edição (Só aparece se clicou no lápis)
+            if st.session_state['edit_idx'] == idx_real:
+                with st.container():
+                    st.markdown("---")
+                    st.write(f"**Editando item {idx_real}:**")
+                    with st.form(f"form_edit_{idx_real}"):
+                        n_desc = st.text_input("Descrição", value=row['Descricao'])
+                        n_val = st.number_input("Valor", value=float(row['Valor']))
+                        if st.form_submit_button("SALVAR ALTERAÇÃO"):
+                            df.at[idx_real, "Descricao"] = n_desc
+                            df.at[idx_real, "Valor"] = n_val
+                            save_full(DB_MOVIMENTOS, df)
+                            st.session_state['edit_idx'] = -1 # Fecha edição
