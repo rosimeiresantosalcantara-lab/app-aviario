@@ -3,71 +3,66 @@ import pandas as pd
 import os
 from datetime import datetime
 
-# --- 1. CONFIGURAÇÃO VISUAL (GRID FORÇADO NO MOBILE) ---
+# --- 1. CONFIGURAÇÃO VISUAL E CSS AVANÇADO ---
 st.set_page_config(page_title="GestorPRO", layout="centered", page_icon="💎")
 
 st.markdown("""
     <style>
-    /* FUNDO */
-    .main { background-color: #f8f9fa; }
-    h1 { color: #1e293b; font-weight: 800; }
-    
-    /* --- CSS MÁGICO PARA FORÇAR GRID NO CELULAR --- */
-    /* Isso obriga as colunas a ficarem lado a lado (50% cada) mesmo em telas pequenas */
+    /* 1. FORÇAR GRID 2x2 NO CELULAR (O CÓDIGO MÁGICO) */
     @media (max-width: 576px) {
+        /* Obriga as colunas a ficarem lado a lado */
         div[data-testid="column"] {
-            width: 50% !important;
-            flex: 0 0 50% !important;
-            min-width: 50% !important;
+            width: 48% !important;
+            flex: 0 0 48% !important;
+            min-width: 10px !important;
+        }
+        /* Ajusta o espaçamento entre elas */
+        div[data-testid="column"] > div {
+            width: 100% !important;
         }
     }
-    
-    /* ESTILO DOS BOTÕES (CARDS) */
-    div.stButton > button {
+
+    /* 2. ESTILO DOS BOTÕES (MENU PRINCIPAL) */
+    .btn-main > button {
         width: 100%;
-        height: 100px; /* Altura fixa para parecer cartão */
-        font-size: 18px; /* Fonte ajustada para caber no celular */
-        font-weight: 600;
-        border-radius: 12px;
-        background-color: white;
-        border: 1px solid #e2e8f0;
-        color: #334155;
-        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
-        white-space: pre-wrap; /* Permite que o texto quebre linha se ficar apertado */
+        height: 100px;
+        font-size: 18px !important;
+        font-weight: 700 !important;
+        color: #1e293b !important;
+        background: white !important;
+        border: 1px solid #cbd5e1 !important;
+        border-radius: 16px !important;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05) !important;
+        margin-bottom: 10px !important;
     }
-    div.stButton > button:hover {
-        border-color: #3b82f6;
-        color: #3b82f6;
+    .btn-main > button:hover {
+        border-color: #3b82f6 !important;
+        color: #3b82f6 !important;
         transform: translateY(-2px);
     }
-
-    /* Ajuste para botões de navegação (Voltar) não ficarem gigantes */
-    div[data-testid="column"] .nav-btn button {
-        height: 50px !important;
-        background-color: #f1f5f9 !important;
-    }
-
-    /* KPI CARDS */
-    div[data-testid="metric-container"] {
-        background-color: white;
-        padding: 10px;
-        border-radius: 10px;
-        border: 1px solid #e2e8f0;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    
+    /* 3. BOTÕES DE AÇÃO (MENORES) */
+    .btn-action > button {
+        height: 60px;
+        border-radius: 12px;
+        font-weight: 600;
+        background-color: #f8fafc;
     }
     
+    /* 4. REMOVER ESPAÇOS EXTRAS DO TOPO */
+    .block-container {
+        padding-top: 2rem;
+        padding-bottom: 5rem;
+    }
+    
+    /* Esconder menus técnicos */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
     </style>
 """, unsafe_allow_html=True)
 
-# --- 2. UTILITÁRIOS ---
-LISTA_FUNCOES = ["Pedreiro", "Servente", "Mestre de Obras", "Motorista", "Cozinheira", "Administrativo"]
-LISTA_MATERIAIS = ["Cimento", "Areia", "Tijolos", "Ferro", "Madeira", "Telhas", "Tintas", "Elétrica", "Hidráulica"]
-LISTA_MANUTENCAO = ["Mecânica", "Pneus", "Óleo", "Elétrica", "Peças", "Funilaria"]
-LISTA_PAGAMENTO = ["Dinheiro", "PIX", "Cartão de Crédito", "Cartão de Débito", "Boleto"]
-
+# --- 2. UTILITÁRIOS DE FORMATAÇÃO ---
 def format_brl(valor):
     if valor is None: return "R$ 0,00"
     try:
@@ -76,21 +71,25 @@ def format_brl(valor):
     except: return "R$ 0,00"
 
 def format_data_visual(data_input):
+    """Converte datas para DD/MM/AAAA apenas para MOSTRAR na tela"""
     if data_input is None: return ""
     try:
         if isinstance(data_input, str):
+            # Se vier do CSV (YYYY-MM-DD)
             data_obj = datetime.strptime(data_input, '%Y-%m-%d')
             return data_obj.strftime('%d/%m/%Y')
+        # Se vier do Date Input (datetime.date)
         return data_input.strftime('%d/%m/%Y')
     except: return str(data_input)
 
 # --- 3. BANCO DE DADOS ---
-DB_FUNC = 'db_funcionarios_v17.csv'
-DB_PONTO = 'db_ponto_v17.csv'
-DB_VEICULOS = 'db_veiculos_v17.csv'
-DB_FINANCEIRO = 'db_financeiro_v17.csv'
-DB_CONFIG = 'db_config_v17.csv'
+DB_FUNC = 'db_funcionarios_v18.csv'
+DB_PONTO = 'db_ponto_v18.csv'
+DB_VEICULOS = 'db_veiculos_v18.csv'
+DB_FINANCEIRO = 'db_financeiro_v18.csv'
+DB_CONFIG = 'db_config_v18.csv'
 
+# Colunas
 COLS_FUNC = ["Nome", "Funcao", "Valor_Diaria", "Data_Inicio", "Chave_Pix", "Banco"]
 COLS_PONTO = ["Data", "Nome", "Qtd_Dias", "Descricao"]
 COLS_VEIC = ["Veiculo", "Placa", "Km_Inicial"]
@@ -128,21 +127,17 @@ def ir_para(tela, voltar_para='inicio'):
 
 def barra_nav(destino):
     st.markdown("---")
-    # Classe específica para os botões de voltar não ficarem enormes
+    # Usa classes CSS específicas para não bugar o layout grid
     c1, c2 = st.columns(2)
     with c1: 
-        st.markdown('<div class="nav-btn">', unsafe_allow_html=True)
         if st.button("⬅️ VOLTAR"): ir_para(destino)
-        st.markdown('</div>', unsafe_allow_html=True)
     with c2: 
-        st.markdown('<div class="nav-btn">', unsafe_allow_html=True)
         if st.button("🏠 INÍCIO"): ir_para('inicio')
-        st.markdown('</div>', unsafe_allow_html=True)
 
-# ================= TELA 1: DASHBOARD (LAYOUT FIXO) =================
+# ================= TELA 1: DASHBOARD (LAYOUT NOVO) =================
 def tela_inicio():
     st.title("GestorPRO")
-    st.caption(f"Hoje: {datetime.now().strftime('%d/%m/%Y')}")
+    st.caption(f"🗓️ Hoje: {datetime.now().strftime('%d/%m/%Y')}")
     
     # KPIs
     df_fin = load_data(DB_FINANCEIRO, COLS_FIN)
@@ -154,29 +149,44 @@ def tela_inicio():
         fatura_cartao = abs(filtro_cartao["Valor"].sum())
 
     c1, c2 = st.columns(2)
-    c1.metric("Caixa", format_brl(saldo_real))
+    c1.metric("Caixa Atual", format_brl(saldo_real))
     c2.metric("Fatura Cartão", format_brl(fatura_cartao), delta_color="inverse")
     
-    st.write("") # Espaço
+    st.write("") 
     st.subheader("Menu Principal")
     
-    # --- GRID REALMENTE LADO A LADO ---
-    # O CSS injetado no início força estas colunas a ficarem lado a lado no celular
-    col1, col2 = st.columns(2)
+    # --- AQUI ESTÁ A CLASSE CSS MÁGICA ---
+    # Colocamos 'st.markdown' com divs vazias apenas para aplicar o estilo se necessário
+    # mas o CSS global já cuida do 'div[data-testid="column"]'
     
-    with col1:
+    c_menu1, c_menu2 = st.columns(2)
+    
+    with c_menu1:
+        st.markdown('<div class="btn-main">', unsafe_allow_html=True)
         if st.button("👷 EQUIPE\n& Ponto"): ir_para('menu_equipe', 'inicio')
-        if st.button("🚛 FROTA\n& Máquinas"): ir_para('menu_frota', 'inicio')
+        st.markdown('</div>', unsafe_allow_html=True)
         
-    with col2:
+        st.markdown('<div class="btn-main">', unsafe_allow_html=True)
+        if st.button("🚛 FROTA\n& Máquinas"): ir_para('menu_frota', 'inicio')
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with c_menu2:
+        st.markdown('<div class="btn-main">', unsafe_allow_html=True)
         if st.button("💰 CAIXA\n& Extrato"): ir_para('menu_fin', 'inicio')
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        st.markdown('<div class="btn-main">', unsafe_allow_html=True)
         if st.button("💳 CARTÕES\n& Faturas"): ir_para('menu_cartao', 'inicio')
+        st.markdown('</div>', unsafe_allow_html=True)
 
 # ================= TELA 2: EQUIPE =================
 def tela_equipe():
     st.title("Gestão de Pessoas")
     
+    # Botão de Cadastro
+    st.markdown('<div class="btn-action">', unsafe_allow_html=True)
     if st.button("➕ NOVO COLABORADOR"): ir_para('cad_func', 'menu_equipe')
+    st.markdown('</div>', unsafe_allow_html=True)
     
     df_func = load_data(DB_FUNC, COLS_FUNC)
     if df_func.empty:
@@ -200,14 +210,14 @@ def tela_equipe():
     
     a_receber = (dias * float(linha_dados["Valor_Diaria"])) - abs(pagos)
     
-    st.info(f"Função: **{linha_dados['Funcao']}** | Admissão: **{format_data_visual(linha_dados['Data_Inicio'])}**")
+    # Info
+    st.info(f"Função: **{linha_dados['Funcao']}**")
     
     c1, c2, c3 = st.columns(3)
     c1.metric("Dias", f"{dias:g}")
     c2.metric("Pago", format_brl(abs(pagos)))
     c3.metric("Saldo", format_brl(a_receber))
     
-    # Abas
     tab1, tab2 = st.tabs(["⚡ AÇÕES", "✏️ EDITAR"])
     
     with tab1:
@@ -220,26 +230,20 @@ def tela_equipe():
             if st.button("📝 FALTA"): ir_para('acao_falta', 'menu_equipe')
 
     with tab2:
-        st.write("Alterar dados:")
         with st.form("edit_func"):
             novo_nome = st.text_input("Nome", value=linha_dados['Nome'])
-            nova_funcao = st.selectbox("Função", LISTA_FUNCOES, index=LISTA_FUNCOES.index(linha_dados['Funcao']) if linha_dados['Funcao'] in LISTA_FUNCOES else 0)
-            novo_valor = st.number_input("Diária (R$)", min_value=0.0, value=float(linha_dados['Valor_Diaria']))
             
+            # Data formatada para DD/MM/YYYY
             try: dt_obj = datetime.strptime(str(linha_dados['Data_Inicio']), '%Y-%m-%d').date()
             except: dt_obj = datetime.now()
-            nova_data = st.date_input("Admissão", value=dt_obj, format="DD/MM/YYYY")
             
-            novo_pix = st.text_input("PIX", value=str(linha_dados['Chave_Pix']))
-            novo_banco = st.text_input("Banco", value=str(linha_dados['Banco']))
+            nova_data = st.date_input("Admissão", value=dt_obj, format="DD/MM/YYYY")
+            novo_valor = st.number_input("Diária (R$)", min_value=0.0, value=float(linha_dados['Valor_Diaria']))
             
             if st.form_submit_button("SALVAR ALTERAÇÕES"):
                 df_func.at[idx_dados, "Nome"] = novo_nome
-                df_func.at[idx_dados, "Funcao"] = nova_funcao
-                df_func.at[idx_dados, "Valor_Diaria"] = novo_valor
                 df_func.at[idx_dados, "Data_Inicio"] = nova_data
-                df_func.at[idx_dados, "Chave_Pix"] = novo_pix
-                df_func.at[idx_dados, "Banco"] = novo_banco
+                df_func.at[idx_dados, "Valor_Diaria"] = novo_valor
                 save_full(DB_FUNC, df_func)
                 st.toast("Atualizado!")
                 st.rerun()
@@ -255,8 +259,11 @@ def tela_cad_func():
     st.header("Novo Cadastro")
     with st.form("cad_func", clear_on_submit=True):
         nome = st.text_input("Nome Completo")
-        func = st.selectbox("Função", LISTA_FUNCOES)
+        func = st.selectbox("Função", ["Pedreiro", "Servente", "Mestre", "Motorista", "Cozinheira", "Outro"])
+        
+        # O FORMATO DD/MM/YYYY ESTÁ AQUI
         dt_ini = st.date_input("Data de Admissão", datetime.now(), format="DD/MM/YYYY")
+        
         val = st.number_input("Valor da Diária (R$)", min_value=0.0, value=None, placeholder="0,00")
         
         st.caption("Bancário (Opcional)")
@@ -309,7 +316,9 @@ def tela_acao_equipe(tipo):
 # ================= TELA 3: FROTA =================
 def tela_frota():
     st.title("Frota")
+    st.markdown('<div class="btn-action">', unsafe_allow_html=True)
     if st.button("➕ NOVO VEÍCULO"): ir_para('cad_veic', 'menu_frota')
+    st.markdown('</div>', unsafe_allow_html=True)
     
     df_v = load_data(DB_VEICULOS, COLS_VEIC)
     if df_v.empty:
@@ -376,10 +385,10 @@ def tela_acao_frota(tipo):
             lit = st.number_input("Litros", min_value=0.0)
             km = st.number_input("KM Painel", min_value=0)
         else:
-            item = st.selectbox("Serviço", LISTA_MANUTENCAO)
+            item = st.selectbox("Serviço", ["Mecânica", "Pneus", "Óleo", "Elétrica", "Peças", "Funilaria"])
             
         val = st.number_input("Valor Pago (R$)", min_value=0.0, value=None, placeholder="0,00")
-        pagto = st.selectbox("Pagamento", LISTA_PAGAMENTO)
+        pagto = st.selectbox("Pagamento", ["Dinheiro", "PIX", "Cartão de Crédito"])
         
         if st.form_submit_button("LANÇAR"):
             if val:
@@ -438,11 +447,11 @@ def tela_movimento(tipo):
             desc = st.text_input("Descrição")
             cat = "Receita"
         else:
-            desc = st.selectbox("Item", LISTA_MATERIAIS)
+            desc = st.selectbox("Item", ["Cimento", "Areia", "Tijolos", "Ferro", "Madeira", "Telhas", "Tintas", "Elétrica", "Hidráulica"])
             cat = "Material"
             
         val = st.number_input("Valor (R$)", min_value=0.0, value=None, placeholder="0,00")
-        pagto = st.selectbox("Pagamento", LISTA_PAGAMENTO)
+        pagto = st.selectbox("Pagamento", ["Dinheiro", "PIX", "Cartão de Crédito", "Cartão de Débito", "Boleto"])
         
         if st.form_submit_button("SALVAR"):
             if val:
