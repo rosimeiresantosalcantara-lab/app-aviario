@@ -369,3 +369,69 @@ def tela_financeiro():
                             df.at[idx_real, "Valor"] = n_val
                             save_full(DB_MOVIMENTOS, df)
                             st.session_state['edit_idx'] = -1 # Fecha edição
+                            st.rerun()
+                    st.markdown("---")
+                    
+            st.divider()
+    
+    barra_navegacao('inicio')
+
+def tela_fin_lancamento(tipo):
+    st.header(f"Lançar {tipo}")
+    desc = st.text_input("Descrição")
+    val = st.number_input("Valor (R$)", min_value=0.0, value=None, placeholder="Digite o valor...")
+    
+    if st.button("SALVAR"):
+        if val is not None:
+            cat = "Receita" if tipo == "Entrada" else "Material/Outros"
+            val_final = val if tipo == "Entrada" else -val
+            add_row(DB_MOVIMENTOS, {"Data": datetime.now(), "Categoria": cat, "Descricao": desc, "Valor": val_final})
+            st.success("Salvo!")
+            ir_para('menu_financeiro')
+            
+    barra_navegacao('menu_financeiro')
+
+def tela_config_obra():
+    st.header("Configuração")
+    df = load_data(DB_OBRA, ["Valor_Total"])
+    atual = float(df["Valor_Total"].iloc[0]) if not df.empty else 0.0
+    
+    st.metric("Valor Atual do Contrato", format_brl(atual))
+    
+    novo = st.number_input("Definir Novo Valor", value=None, placeholder="Digite valor total...")
+    if st.button("ATUALIZAR"):
+        if novo is not None:
+            pd.DataFrame([{"Valor_Total": novo}]).to_csv(DB_OBRA, index=False)
+            st.success("Atualizado!")
+            st.rerun()
+            
+    barra_navegacao('inicio')
+
+# ================= ROTEADOR =================
+def main():
+    tela = st.session_state['tela']
+    
+    if tela == 'inicio': tela_inicio()
+    
+    # Equipe
+    elif tela == 'menu_equipe': tela_equipe()
+    elif tela == 'cad_func': tela_cad_func()
+    elif tela == 'acao_ponto': tela_acoes_equipe("Ponto")
+    elif tela == 'acao_vale': tela_acoes_equipe("Vale")
+    elif tela == 'acao_pgto': tela_acoes_equipe("Pagamento")
+    elif tela == 'acao_obs': tela_acoes_equipe("Faltas")
+    
+    # Frota
+    elif tela == 'menu_frota': tela_frota()
+    elif tela == 'cad_veiculo': tela_cad_veiculo()
+    elif tela == 'acao_abastecer': tela_acao_frota("Abastecer")
+    elif tela == 'acao_manutencao': tela_acao_frota("Manutenção")
+    
+    # Financeiro
+    elif tela == 'menu_financeiro': tela_financeiro()
+    elif tela == 'fin_entrada': tela_fin_lancamento("Entrada")
+    elif tela == 'fin_saida': tela_fin_lancamento("Saída")
+    elif tela == 'config_obra': tela_config_obra()
+
+if __name__ == "__main__":
+    main()
